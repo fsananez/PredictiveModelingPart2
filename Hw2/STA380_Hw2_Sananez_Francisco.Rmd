@@ -1,0 +1,278 @@
+---
+title: "STA380 Homework 2"
+author: "Francisco Sananez"
+date: "August 17, 2015"
+output: word_document
+---
+
+# Flights at ABIA
+
+To begin the "ABIA.csv" data was loaded and saved as flights. We used the *head()* function to get a feel of how the data is portrayed. We can identify specific flights that are either arriving to or departing from Austin by looking at the *Origin* and *Dest* columns. 
+
+```{r}
+library(ggplot2)
+library(plyr)
+flights <- read.csv("ABIA.csv")
+flights <- subset(flights, flights$Dest != "DSM")
+head(flights)
+```
+
+In order to get a better view of the data, it was broken into two sets. The arriving flights set as *arrflights* and the departing flights set as *depflights*.
+
+## Arriving Flights
+### Hourly Delays
+Here we can see which hours of the day are better to have as the scheduled arrival time, ignoring where you are coming from. 
+
+```{r, echo=FALSE}
+arrflights <- subset(flights, flights$Dest == "AUS")
+arrflights <- arrflights[order(arrflights$CRSArrTime),]
+
+arrflights$CRSArrTime <- as.integer(arrflights$CRSArrTime/100)
+arrflights$CRSArrTime <- factor(arrflights$CRSArrTime)
+arrflights$ArrDelay[is.na(arrflights$ArrDelay)] <- 0
+
+aux <- tapply(arrflights$ArrDelay, arrflights$CRSArrTime, mean)
+
+qplot(unique(arrflights$CRSArrTime), aux, xlab= "Hour of the Day", ylab= "Avg Arrival Delay", main="Austin Arrivals")
+```
+
+We clearly see that having a schedule time of arrival in the early morning is the best bet as arrival delays through these hours (4 am - 9 am) are used to be very low.
+
+### Monthly Delays
+Here we can see which months are best and worst when it comes to arrival delays.
+
+```{r, echo=FALSE}
+arrflights <- subset(flights, flights$Dest == "AUS")
+
+arrflights$Month <- factor(arrflights$Month)
+arrflights$ArrDelay[is.na(arrflights$ArrDelay)] <- 0
+
+aux <- tapply(arrflights$ArrDelay, arrflights$Month, mean)
+qplot(unique(arrflights$Month), aux, xlab= "Month", ylab= "Avg Arrival Delay", main="Austin Arrivals")
+```
+
+We see, as one would expect, that December is the worst month to fly to Austin, since on average we have a 15 minute arrival delay. On the other hand, September/October are months that usually don't have the enormous volume of passengers that December has, therefore, we can see that delays during these months are no big deal.
+
+## Departing Flights
+### Hourly Delays
+Here we can see which hours of the day are better to fly departing from Austin. 
+
+```{r, echo=FALSE}
+depflights <- subset(flights, flights$Origin == "AUS")
+depflights <- depflights[order(depflights$CRSDepTime),]
+
+depflights$CRSDepTime <- as.integer(depflights$CRSDepTime/100)
+depflights$CRSDepTime <- factor(depflights$CRSDepTime)
+depflights$DepDelay[is.na(depflights$DepDelay)] <- 0
+
+aux <- tapply(depflights$DepDelay, depflights$CRSDepTime, mean)
+
+qplot(unique(depflights$CRSDepTime), aux, xlab= "Hour of the Day", ylab= "Avg Departure Delay", main="Austin Departures")
+```
+
+It is interesting to see that there are no flights departing from Austin between 1:00 am and 5:00 am. Also, one would think that departures are usually delayed more as the hours pass by, which we see that it holds true. Early in the morning we don't see much delays, but as we progress in the we see a stable increase in average delays. 
+
+### Monthly Delays
+Here we can see which months are best and worst when flying from Austin.
+
+```{r, echo=FALSE}
+depflights <- subset(flights, flights$Origin == "AUS")
+
+depflights$Month <- factor(depflights$Month)
+depflights$DepDelay[is.na(depflights$DepDelay)] <- 0
+
+aux <- tapply(depflights$DepDelay, depflights$Month, mean)
+qplot(unique(depflights$Month), aux, xlab= "Month", ylab= "Avg Departure Delay", main="Austin Departures")
+```
+
+As we saw in the figure of monthly arrival delays, December was the worst month to travel, for departures this is no exception. We see that December again leads the worst average delays, and again September/October are the best months to travel. One interesting point to study is the fact that for departures March has higher delays almost reaching December's average delays. A hypothesis for this phenomenon is the fact that Austin is home to numerous Universities, and March represent the month when spring break usually occurs, therefore a lot of students are flying out of Austin, increasing in some level the average delays.
+
+### Worst Airports to Travel to 
+Here we see the average delays to each airport that someone can travel from Austin. 
+
+```{r, echo=FALSE}
+depflights <- subset(flights, flights$Origin == "AUS")
+
+depflights <- depflights[order(depflights$Dest),]
+
+depflights$DepDelay[is.na(depflights$DepDelay)] <- 0
+
+aux <- tapply(depflights$DepDelay, depflights$Dest, mean)
+aux[is.na(aux)] <- 0
+
+flights <- flights[order(flights$Dest),]
+
+qplot(names(aux), aux, xlab= "Airport", ylab= "Avg Departure Delay", main="Austin Departures")
+```
+
+For display purposes the figure has been cut to just show the airports that have on average delays over 10 minutes
+
+```{r, echo=FALSE}
+
+aux <- subset(aux, aux >= 10)
+
+qplot(names(aux), aux, xlab= "Airport", ylab= "Avg Departure Delay", main="Austin Departures")
+
+```
+
+As one would expect big connecting airport like Newark Liberty International Airport or Washington Dulles International Airport, to name the top delays, have more volume of passengers and therefore are expected to have greater delays.
+
+# Author Attribution
+
+First we read in our training data and create the corresponding corpus for it. When then proceed to clean the corpus by removing nuisance like numbers, punctuation and words that have no real descriptive meaning. Finally we create the Document Term Matrix(DTM) for the cleaned corpus.
+
+```{r, echo = FALSE}
+library(tm)
+
+readerPlain = function(fname){
+    readPlain(elem = list(content = readLines(fname)), id = fname, language = 'en')}
+
+author_dirs = Sys.glob('ReutersC50/C50train/*')
+file_list = NULL
+labels = NULL
+
+for(author in author_dirs) 
+{
+  author_name = substring(author, first=21)
+  files_to_add = Sys.glob(paste0(author, '/*.txt'))
+  file_list = append(file_list, files_to_add)
+  labels = append(labels, rep(author_name, length(files_to_add)))
+}
+
+all_docs = lapply(file_list, readerPlain) 
+names(all_docs) = file_list
+names(all_docs) = sub('.txt', '', names(all_docs))
+my_corpus = Corpus(VectorSource(all_docs))
+names(my_corpus) = labels
+my_corpus = tm_map(my_corpus, content_transformer(tolower))
+my_corpus = tm_map(my_corpus, content_transformer(removeNumbers))
+my_corpus = tm_map(my_corpus, content_transformer(removePunctuation))
+my_corpus = tm_map(my_corpus, content_transformer(stripWhitespace))
+my_corpus = tm_map(my_corpus, content_transformer(removeWords), stopwords("SMART"))
+DTM_train = DocumentTermMatrix(my_corpus)
+DTM_train
+```
+
+With these information we see that the sparsity of the data provided is 99% so we must remove some sparse terms in order to provide a DTM that is easier to handle, computationally cost speaking. A maximum of *0.97* was decided in order to remove the sparse terms.
+
+```{r, echo=FALSE}
+DTM_train = removeSparseTerms(DTM_train, 0.97) 
+DTM_train
+X_train = as.matrix(DTM_train)
+```
+
+With a 92% we are more than happy to continue our study, therefore, we convert the DTM to a Dense Matrix (*X_train*). For the test data we run the same process that was applied to the the training data. This means creating the corresponding corpus, cleaning it and creating the DTM. Also, removing the sparse terms by a maximum of *0.97* since the first sparsity was also 99% and converting it to a Dense Matrix (*X_test*).
+
+```{r, echo=FALSE}
+author_dirs = Sys.glob('ReutersC50/C50test/*')
+file_list = NULL
+labels = NULL
+
+for(author in author_dirs) 
+{
+  author_name = substring(author, first=20)
+  files_to_add = Sys.glob(paste0(author, '/*.txt'))
+  file_list = append(file_list, files_to_add)
+  labels = append(labels, rep(author_name, length(files_to_add)))
+}
+
+all_docs = lapply(file_list, readerPlain) 
+names(all_docs) = file_list
+names(all_docs) = sub('.txt', '', names(all_docs))
+test_corpus = Corpus(VectorSource(all_docs))
+names(test_corpus) = labels
+test_corpus = tm_map(test_corpus, content_transformer(tolower)) 
+test_corpus = tm_map(test_corpus, content_transformer(removeNumbers)) 
+test_corpus = tm_map(test_corpus, content_transformer(removePunctuation))
+test_corpus = tm_map(test_corpus, content_transformer(stripWhitespace))
+test_corpus = tm_map(test_corpus, content_transformer(removeWords), stopwords("SMART"))
+DTM_test = DocumentTermMatrix(test_corpus)
+DTM_test
+DTM_test = removeSparseTerms(DTM_test, 0.97)
+DTM_test
+X_test = as.matrix(DTM_test)
+```
+
+### Naive Bayes
+
+Now with both Dense Matrix we can proceed by running a Naive Bayes model. First we intersected both column names of each Dense Matrix in order to obtain the common words between both of them. Then we trimmed each Dense Matrix, based on these common words, in order to have them both with the same dimensions and column names (words).
+
+```{r, echo=FALSE}
+common_words <- intersect(colnames(X_train), colnames(X_test)) 
+
+ncol(X_test)
+ncol(X_train)
+
+X_test <- X_test[,common_words]
+X_train <- X_train[,common_words]
+
+ncol(X_test)
+ncol(X_train)
+```
+
+We even see that at the beginning each Dense Matrix has a different number of columns but after trimming them they had the same number. 
+
+Now we smooth out each author, in order to account for the possibility that a word that hasn't been used by such author, can indeed be used in the future by the same author. We calculate the log probabilities under the Naive Bayes model in order to compare them and predict based on them the author of the Test data. 
+
+```{r, echo=FALSE}
+smooth_count <- 1/nrow(X_train)
+W_train <- X_train + smooth_count
+W_train <- rowsum(W_train, group = names(test_corpus))
+W_train <- log(W_train/rowSums(W_train))
+log_prob <- X_test%*%t(W_train)
+Author_pred <- colnames(log_prob)[max.col(log_prob)]
+
+Total_Predicted <- as.integer(Author_pred==names(test_corpus))
+Accuracy <- (sum(Total_Predicted)/length(Total_Predicted))*100
+Accuracy
+```
+
+We calculate the accuracy of the Naive Bayes model and see that we got a 59%, which is not as great as one would expect but at least is higher than just a plain 50:50 chance. Now For the sake of it we went and show specifically which Authors where easier to predict and which ones where just nearly impossible. 
+
+```{r, echo=FALSE}
+Accuracy_per_author <- ((tapply(Total_Predicted, names(test_corpus), sum))/50)*100
+subset(Accuracy_per_author, Accuracy_per_author >= 80)
+subset(Accuracy_per_author, Accuracy_per_author <= 20)
+```
+
+The above percentages show the accuracy of prediction for each individual author. We have just listed the ones that had an accuracy of 80% or higher and the ones that had a 20% or lower.
+
+### Multinomial Regression
+
+Comparing Naive Bayes to a Multinomial regression we must first calculate the accuracy of the multinomial regression at predicting such authors. 
+
+Therefore, we first create a train model based on our *DTM_train* and vectors on the train corpus names. Also, since we have seen that this data has a lot of sparsity we decide to implement a Stochastic gradient descent efficiently which will estimate the maximum likelihood logistic regression coefficients from our sparse data. Moving forward we also run a prediction based on our training model and using the DTM_test as the testing DTM.
+
+```{r, include=FALSE}
+library(maxent)
+Multi_train <- maxent(DTM_train, code_vector = names(my_corpus), use_sgd = TRUE, l1_regularizer = 1.0)
+Multi_pred <- predict(Multi_train,DTM_test)
+```
+
+AS we did with the Naive Bayes model, based on our prediction we now calculate the accuracy of our multinomial regression model.
+
+```{r, echo=FALSE}
+Author_pred <- Multi_pred[,1]
+Total_Predicted <- as.integer(Author_pred==names(test_corpus))
+Accuracy <- (sum(Total_Predicted)/length(Total_Predicted))*100
+Accuracy
+```
+
+We clearly see that using a multinomial regression model wont do us any good since its accuracy is only 5.2%, we must then decide to go with the Naive Bayes model
+
+# Practice with Association Rule Mining
+
+When running the Association Rule Mining model it has been decided to go for a minimum support of *0.009* since this means that we are looking at at least 0.9% of the transactions have a certain itemset, this means around 90 baskets contained a certain itemset making it interesting to capture. Also, it has been decided to use a confidence minimum of *0.5*, meaning that we can say that that all rules will have a confidence of 50% or higher of actually happening.
+
+```{r}
+library(arules)
+baskets <- read.transactions("groceries.txt", format = c("basket"), sep = ',')  
+grocerie_rules <- apriori(baskets, parameter=list(support=0.009, confidence=0.5))
+inspect(grocerie_rules)
+```
+
+By running the model we have gotten 25 rules that are interesting to study, just to mention the the one with the highest confidence is the rule that states the following:
+
+                    {butter,yogurt} => {whole milk} 
+
+with a confidence of 63.88% and a support of around 0.94%.
